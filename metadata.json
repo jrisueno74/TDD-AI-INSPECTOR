@@ -1,0 +1,5 @@
+{
+  "name": "TDD AI Inspector",
+  "description": "Herramienta de Technical Due Diligence con asistencia de IA para inspecciones de edificios.",
+  "requestFramePermissions": ["camera", "microphone"]
+}
