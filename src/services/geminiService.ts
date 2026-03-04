@@ -5,18 +5,19 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function analyzeFinding(
   project: Project,
-  finding: Partial<Finding>
+  finding: Partial<Finding>,
+  language: string = 'es'
 ): Promise<string> {
   const prompt = `
-Eres un experto inspector de Technical Due Diligence (TDD) para edificios en España.
-El edificio inspeccionado es de tipo "${project.type}" construido en el año ${project.year}.
-El inspector ha registrado un hallazgo en la categoría "${finding.category}":
+You are an expert Technical Due Diligence (TDD) inspector for buildings in Spain.
+The inspected building is of type "${project.type}" built in the year ${project.year}.
+The inspector has registered a finding in the category "${finding.category}":
 "${finding.description}"
 
-1. Indica brevemente si esto parece cumplir con la normativa española aplicable (ej. CTE si es posterior a 2008) o si es una incidencia.
-2. Sugiere 1 o 2 elementos relacionados que el inspector debería revisar mientras está en esta área.
+1. Indicate if this seems to comply with the applicable Spanish regulations. **Specifically mention which regulation, code, or article (e.g., CTE DB-SI, RSCIEI, REBT, RITE, etc.) applies to this finding based on the construction year (${project.year}) and building type (${project.type}).**
+2. Suggest 1 or 2 related elements the inspector should check while in this area.
 
-Mantén la respuesta concisa, profesional y en español.
+Keep the response concise, professional, structured, and in the language: ${language}.
   `;
 
   const parts: any[] = [{ text: prompt }];
@@ -42,18 +43,18 @@ Mantén la respuesta concisa, profesional y en español.
   }
 }
 
-export async function generateFinalChecklist(project: Project, findings: Finding[]): Promise<string> {
+export async function generateFinalChecklist(project: Project, findings: Finding[], language: string = 'es'): Promise<string> {
   const prompt = `
-Eres un experto en Technical Due Diligence.
-El inspector ha terminado la visita de un edificio tipo "${project.type}" del año ${project.year}.
-Aquí están los hallazgos registrados:
-${findings.map(f => `- [${f.category}] ${f.isIncidence ? '(Incidencia)' : '(OK)'} ${f.description}`).join('\n')}
+You are an expert in Technical Due Diligence.
+The inspector has finished the visit of a building type "${project.type}" from the year ${project.year}.
+Here are the registered findings:
+${findings.map(f => `- [${f.category}] ${f.isIncidence ? '(Incidence)' : '(OK)'} ${f.description}`).join('\n')}
 
-Tu objetivo ahora es ayudar al técnico a preparar su trabajo de "oficina" (cuando llegue a casa a redactar el informe final).
-Basado en el tipo de edificio, año y los hallazgos:
-1. Enumera qué normativas específicas (ej. CTE, RSCIEI, etc.) debería consultar en la oficina para verificar los hallazgos anotados.
-2. Señala si hay alguna incongruencia o punto ciego en la información recopilada que deba tener en cuenta al redactar (ej. "Anotaste algo de PCI pero no tienes fotos de los extintores").
-Responde en formato Markdown, estructurado y directo.
+Your goal now is to help the technician prepare their "office" work (when they get home to write the final report).
+Based on the building type, year, and findings:
+1. List what specific regulations (e.g., CTE, RSCIEI, etc.) they should consult in the office to verify the noted findings.
+2. Point out if there is any incongruence or blind spot in the collected information that they should keep in mind when writing (e.g., "You noted something about fire protection but have no photos of extinguishers").
+Respond in Markdown format, structured, direct, and in the language: ${language}.
   `;
 
   try {

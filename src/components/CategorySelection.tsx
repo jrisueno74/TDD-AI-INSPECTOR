@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { Project } from '../types';
 import { CheckSquare, Square, ArrowRight } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 export const ALL_CATEGORIES = [
-  'Estructura',
-  'Cubiertas',
-  'Suelos',
-  'Acabados',
-  'Instalaciones',
-  'PCI (Incendios)',
-  'Accesibilidad'
+  'cat.structure',
+  'cat.facade',
+  'cat.roof',
+  'cat.hvac',
+  'cat.fire',
+  'cat.electrical',
+  'cat.plumbing',
+  'cat.accessibility'
 ];
 
 interface Props {
@@ -19,6 +21,7 @@ interface Props {
 }
 
 export function CategorySelection({ project, onConfirm, onCancel }: Props) {
+  const { t } = useLanguage();
   const [selected, setSelected] = useState<string[]>(project.selectedCategories?.length > 0 ? project.selectedCategories : ALL_CATEGORIES);
 
   const toggleCategory = (cat: string) => {
@@ -37,7 +40,7 @@ export function CategorySelection({ project, onConfirm, onCancel }: Props) {
 
   return (
     <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded-2xl shadow-sm border border-gray-100">
-      <h2 className="text-xl font-semibold text-gray-900 mb-2">Alcance de la Inspección</h2>
+      <h2 className="text-xl font-semibold text-gray-900 mb-2">{t('setup.categories')}</h2>
       <p className="text-sm text-gray-600 mb-6">
         Selecciona las categorías que aplican para el edificio <strong>{project.name}</strong>.
       </p>
@@ -58,7 +61,7 @@ export function CategorySelection({ project, onConfirm, onCancel }: Props) {
             ) : (
               <Square className="w-5 h-5 text-gray-400" />
             )}
-            <span className="font-medium">{cat}</span>
+            <span className="font-medium">{t(cat)}</span>
           </button>
         ))}
       </div>
@@ -68,13 +71,13 @@ export function CategorySelection({ project, onConfirm, onCancel }: Props) {
           onClick={onCancel}
           className="w-1/3 flex justify-center py-3 px-4 border border-gray-300 rounded-xl shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
         >
-          Cancelar
+          {t('setup.cancel')}
         </button>
         <button
           onClick={handleConfirm}
           className="w-2/3 flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
         >
-          Comenzar Inspección
+          {t('setup.start')}
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { SavedInspection } from '../types';
 import { getInspections, deleteInspection } from '../services/storage';
 import { Plus, Clock, FileText, Trash2, Building, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface Props {
   onNewInspection: () => void;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function Dashboard({ onNewInspection, onLoadInspection }: Props) {
+  const { t, language } = useLanguage();
   const [inspections, setInspections] = useState<SavedInspection[]>([]);
 
   useEffect(() => {
@@ -24,7 +26,7 @@ export function Dashboard({ onNewInspection, onLoadInspection }: Props) {
   };
 
   const formatDate = (timestamp: number) => {
-    return new Intl.DateTimeFormat('es-ES', {
+    return new Intl.DateTimeFormat(language === 'en' ? 'en-US' : language === 'pt' ? 'pt-BR' : language === 'fr' ? 'fr-FR' : 'es-ES', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -37,15 +39,15 @@ export function Dashboard({ onNewInspection, onLoadInspection }: Props) {
     <div className="max-w-4xl mx-auto space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Mis Inspecciones</h1>
-          <p className="text-gray-500 mt-2">Gestiona tus informes y borradores de TDD</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('dashboard.title')}</h1>
+          <p className="text-gray-500 mt-2">{t('app.subtitle')}</p>
         </div>
         <button
           onClick={onNewInspection}
           className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium shadow-sm"
         >
           <Plus className="w-5 h-5" />
-          Nueva Inspección
+          {t('dashboard.new')}
         </button>
       </div>
 
@@ -54,16 +56,16 @@ export function Dashboard({ onNewInspection, onLoadInspection }: Props) {
           <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <FileText className="w-8 h-8" />
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No hay inspecciones</h3>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('dashboard.empty')}</h3>
           <p className="text-gray-500 mb-6 max-w-md mx-auto">
-            Aún no has creado ninguna inspección. Comienza una nueva para registrar hallazgos y generar informes.
+            {t('dashboard.empty.desc')}
           </p>
           <button
             onClick={onNewInspection}
             className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors font-medium"
           >
             <Plus className="w-5 h-5" />
-            Comenzar ahora
+            {t('dashboard.new')}
           </button>
         </div>
       ) : (
@@ -91,12 +93,12 @@ export function Dashboard({ onNewInspection, onLoadInspection }: Props) {
                       {inspection.project && (
                         <span className="flex items-center gap-1">
                           <Building className="w-4 h-4" />
-                          {inspection.project.type}
+                          {t(`asset.${inspection.project.type.toLowerCase()}`)}
                         </span>
                       )}
                       <span className="flex items-center gap-1">
                         <AlertTriangle className="w-4 h-4" />
-                        {inspection.findings.length} hallazgos
+                        {inspection.findings.length}
                       </span>
                     </div>
                   </div>
@@ -105,12 +107,12 @@ export function Dashboard({ onNewInspection, onLoadInspection }: Props) {
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                     inspection.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
                   }`}>
-                    {inspection.status === 'completed' ? 'Completado' : 'Borrador'}
+                    {inspection.status === 'completed' ? t('dashboard.completed') : t('dashboard.draft')}
                   </span>
                   <button
                     onClick={(e) => handleDelete(e, inspection.id)}
                     className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Eliminar inspección"
+                    title={t('dashboard.delete')}
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>

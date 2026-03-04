@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Project, Finding } from '../types';
 import { analyzeFinding } from '../services/geminiService';
 import { Camera, Mic, MicOff, AlertTriangle, CheckCircle2, Send, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface Props {
   project: Project;
@@ -11,7 +12,8 @@ interface Props {
 }
 
 export function InspectionView({ project, findings, onAddFinding, onFinish }: Props) {
-  const categories = project.selectedCategories || ['Estructura'];
+  const { t, language } = useLanguage();
+  const categories = project.selectedCategories || ['cat.structure'];
   const [category, setCategory] = useState(categories[0]);
   const [description, setDescription] = useState('');
   const [isIncidence, setIsIncidence] = useState(false);
@@ -55,7 +57,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = 'es-ES';
+      recognition.lang = language === 'en' ? 'en-US' : language === 'pt' ? 'pt-BR' : language === 'fr' ? 'fr-FR' : 'es-ES';
 
       recognition.onresult = (event: any) => {
         let finalTranscript = '';
@@ -80,11 +82,11 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
 
       recognitionRef.current = recognition;
     }
-  }, []);
+  }, [language]);
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
-      alert("El dictado por voz no está soportado en este navegador. Por favor, usa Chrome o Edge.");
+      alert(t('inspection.speech_error'));
       return;
     }
     if (isListening) {
@@ -130,7 +132,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
       photoMimeType: photoMimeType || undefined,
     };
 
-    const aiFeedback = await analyzeFinding(project, partialFinding);
+    const aiFeedback = await analyzeFinding(project, partialFinding, language);
 
     const newFinding: Finding = {
       id: Date.now().toString(),
@@ -167,7 +169,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
     <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
       <div className="md:col-span-2 space-y-6">
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Nuevo Hallazgo</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('inspection.new_finding')}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex gap-2 overflow-x-auto pb-2">
               {categories.map(c => (
@@ -181,7 +183,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
                       : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
                   }`}
                 >
-                  {c}
+                  {t(c)}
                 </button>
               ))}
             </div>
@@ -190,7 +192,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe lo que estás viendo (ej. 'La presión de la BIE está baja...')"
+                placeholder={t('inspection.placeholder')}
                 className="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 border min-h-[100px]"
                 required
               />
@@ -204,7 +206,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
                   className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
                 >
                   <Camera className="w-5 h-5" />
-                  <span className="text-sm font-medium">Foto</span>
+                  <span className="text-sm font-medium">{t('inspection.photo')}</span>
                 </button>
                 <input 
                   type="file" 
@@ -220,10 +222,10 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
                   className={`flex items-center gap-2 transition-colors ${
                     isListening ? 'text-red-500 hover:text-red-600 animate-pulse' : 'text-gray-600 hover:text-blue-600'
                   }`}
-                  title={isListening ? "Detener dictado" : "Iniciar dictado por voz"}
+                  title={isListening ? "Detener dictado" : t('inspection.dictate')}
                 >
                   {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                  <span className="text-sm font-medium">{isListening ? 'Escuchando...' : 'Dictar'}</span>
+                  <span className="text-sm font-medium">{isListening ? t('inspection.listening') : t('inspection.dictate')}</span>
                 </button>
               </div>
 
@@ -234,7 +236,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
                   onChange={(e) => setIsIncidence(e.target.checked)}
                   className="rounded text-red-600 focus:ring-red-500 h-4 w-4"
                 />
-                <span className="text-sm font-medium text-gray-700">Marcar como Incidencia</span>
+                <span className="text-sm font-medium text-gray-700">{t('inspection.mark_incidence')}</span>
               </label>
             </div>
 
@@ -260,12 +262,12 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
               {isAnalyzing ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Analizando con IA...
+                  {t('inspection.analyzing')}
                 </>
               ) : (
                 <>
                   <Send className="w-5 h-5" />
-                  Registrar Hallazgo
+                  {t('inspection.register')}
                 </>
               )}
             </button>
@@ -274,25 +276,25 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
 
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Hallazgos Registrados</h3>
+            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">{t('inspection.registered_findings')}</h3>
             <div className="flex gap-2">
               <button
                 onClick={() => setFilterType('all')}
                 className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${filterType === 'all' ? 'bg-gray-800 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
               >
-                Todos
+                {t('inspection.filter.all')}
               </button>
               <button
                 onClick={() => setFilterType('incidence')}
                 className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${filterType === 'incidence' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
               >
-                Incidencias
+                {t('inspection.filter.incidences')}
               </button>
               <button
                 onClick={() => setFilterType('observation')}
                 className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${filterType === 'observation' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
               >
-                Observaciones
+                {t('inspection.filter.observations')}
               </button>
             </div>
           </div>
@@ -310,7 +312,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
                   className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-100"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-gray-900">{cat}</span>
+                    <span className="font-semibold text-gray-900">{t(cat)}</span>
                     <span className="bg-white px-2 py-0.5 rounded-full text-xs font-medium text-gray-600 border border-gray-200">
                       {catFindings.length}
                     </span>
@@ -336,7 +338,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
                             <span className={`text-xs font-semibold uppercase tracking-wider ${f.isIncidence ? 'text-red-600' : 'text-green-600'}`}>
-                              {f.isIncidence ? 'Incidencia' : 'Observación'}
+                              {f.isIncidence ? t('inspection.incidence') : t('inspection.observation')}
                             </span>
                             <span className="text-xs text-gray-400">{new Date(f.timestamp).toLocaleTimeString()}</span>
                           </div>
@@ -358,12 +360,6 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
               </div>
             );
           })}
-
-          {findings.length === 0 && (
-            <div className="text-center py-8 text-gray-500 text-sm bg-white rounded-2xl border border-gray-100 border-dashed">
-              No hay hallazgos registrados aún.
-            </div>
-          )}
         </div>
       </div>
 
@@ -381,7 +377,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
                     ) : (
                       <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
                     )}
-                    {cat}
+                    {t(cat)}
                   </span>
                   <span className={count > 0 ? 'font-medium text-gray-900' : 'text-gray-400'}>{count}</span>
                 </div>
@@ -404,7 +400,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
             onClick={handleAttemptFinish}
             className="w-full flex justify-center items-center py-2.5 px-4 border border-gray-300 rounded-xl shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
           >
-            Previsualizar Informe
+            {t('inspection.finish')}
           </button>
         </div>
       </div>
@@ -414,26 +410,26 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
             <div className="flex items-center gap-3 text-amber-600 mb-4">
               <AlertTriangle className="w-6 h-6" />
-              <h3 className="text-lg font-bold text-gray-900">Inspección Incompleta</h3>
+              <h3 className="text-lg font-bold text-gray-900">{t('inspection.warning.title')}</h3>
             </div>
             <p className="text-gray-600 mb-4">
-              Para poder hacer un buen análisis en la oficina, es recomendable llevarse información de todas las áreas. Te faltan por revisar:
+              {t('inspection.warning.desc')}
             </p>
             <ul className="list-disc pl-5 mb-6 text-sm text-gray-700 space-y-1">
-              {missingCategories.map(c => <li key={c}>{c}</li>)}
+              {missingCategories.map(c => <li key={c}>{t(c)}</li>)}
             </ul>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowWarning(false)}
                 className="flex-1 py-2.5 px-4 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
-                Volver y revisar
+                {t('inspection.warning.back')}
               </button>
               <button
                 onClick={onFinish}
                 className="flex-1 py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-medium transition-colors"
               >
-                Finalizar de todos modos
+                {t('inspection.warning.force')}
               </button>
             </div>
           </div>

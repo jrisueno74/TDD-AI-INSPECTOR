@@ -5,10 +5,13 @@ import { CategorySelection } from './components/CategorySelection';
 import { InspectionView } from './components/InspectionView';
 import { ReportView } from './components/ReportView';
 import { Dashboard } from './components/Dashboard';
-import { ClipboardCheck } from 'lucide-react';
+import { ClipboardCheck, Globe } from 'lucide-react';
 import { saveInspection } from './services/storage';
+import { useLanguage } from './context/LanguageContext';
+import { Language } from './i18n/translations';
 
 export default function App() {
+  const { t, language, setLanguage } = useLanguage();
   const [view, setView] = useState<ViewState>('dashboard');
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [project, setProject] = useState<Project | null>(null);
@@ -89,21 +92,36 @@ export default function App() {
             <div className="bg-blue-600 p-2 rounded-lg">
               <ClipboardCheck className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-xl tracking-tight">TDD AI Inspector</span>
+            <span className="font-bold text-xl tracking-tight">{t('app.title')}</span>
           </div>
-          {project && view === 'inspection' && (
-            <div className="flex items-center gap-4">
-              <div className="text-sm font-medium text-gray-500">
-                {project.name}
+          <div className="flex items-center gap-4">
+            {project && view === 'inspection' && (
+              <div className="flex items-center gap-4 border-r border-gray-200 pr-4">
+                <div className="text-sm font-medium text-gray-500">
+                  {project.name}
+                </div>
+                <button
+                  onClick={() => setView('dashboard')}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  {t('inspection.save_exit')}
+                </button>
               </div>
-              <button
-                onClick={() => setView('dashboard')}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            )}
+            <div className="flex items-center gap-2">
+              <Globe className="w-4 h-4 text-gray-500" />
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as Language)}
+                className="text-sm border-none bg-transparent text-gray-600 focus:ring-0 cursor-pointer"
               >
-                Guardar y salir
-              </button>
+                <option value="es">ES</option>
+                <option value="en">EN</option>
+                <option value="pt">PT</option>
+                <option value="fr">FR</option>
+              </select>
             </div>
-          )}
+          </div>
         </div>
       </header>
 
