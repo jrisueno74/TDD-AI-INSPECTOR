@@ -149,7 +149,7 @@ export function ReportView({ project, findings, onRestart }: Props) {
               <span>{t('report.generating')}</span>
             </div>
           ) : (
-            <div className="prose prose-blue max-w-none text-blue-900">
+            <div className="prose prose-blue max-w-none text-blue-900 prose-headings:text-blue-900 prose-headings:font-bold prose-h3:text-lg prose-h3:mt-6 prose-h3:mb-3 prose-p:mb-4 prose-li:mb-2">
               <Markdown>{checklist || ''}</Markdown>
             </div>
           )}

@@ -338,7 +338,15 @@ export async function exportToDocx(
           createHeading2("1.1 Alcance de la Inspección"),
           createBodyText(`Categorías inspeccionadas: ${Object.keys(findingsByCategory).map(c => t(c)).join(', ')}.`),
           
-          createHeading2("1.2 Valoración General"),
+          ...(project.locationDescription ? [
+            createHeading2("1.2 Entorno y Ubicación"),
+            createBodyText(project.locationDescription),
+            new Paragraph({ text: "", spacing: { before: 200 } }),
+            createHeading2("1.3 Valoración General"),
+          ] : [
+            createHeading2("1.2 Valoración General"),
+          ]),
+
           new Table({
             width: { size: PAGE_WIDTH, type: WidthType.DXA },
             columnWidths: [3000, PAGE_WIDTH - 3000],
@@ -356,6 +364,65 @@ export async function exportToDocx(
               createAssessmentRow("Acción prioritaria recomendada", incidences.length > 0 ? "Revisar incidencias críticas" : "Mantenimiento preventivo"),
             ],
           }),
+          
+          createHeading2(project.locationDescription ? "1.4 Resumen de Incidencias Detectadas" : "1.3 Resumen de Incidencias Detectadas"),
+          incidences.length === 0
+            ? createBodyText("No se han detectado incidencias.")
+            : new Table({
+                width: { size: PAGE_WIDTH, type: WidthType.DXA },
+                columnWidths: [1800, 3613, 3613],
+                borders: {
+                  top: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
+                  bottom: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
+                  left: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
+                  right: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
+                  insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
+                  insideVertical: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
+                },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        width: { size: 1800, type: WidthType.DXA },
+                        shading: { type: ShadingType.CLEAR, fill: COLORS.LightBlue },
+                        margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                        children: [new Paragraph({ children: [new TextRun({ text: "Categoría", bold: true, font: "Calibri", size: 18 })] })],
+                      }),
+                      new TableCell({
+                        width: { size: 3613, type: WidthType.DXA },
+                        shading: { type: ShadingType.CLEAR, fill: COLORS.LightBlue },
+                        margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                        children: [new Paragraph({ children: [new TextRun({ text: "Incidencia", bold: true, font: "Calibri", size: 18 })] })],
+                      }),
+                      new TableCell({
+                        width: { size: 3613, type: WidthType.DXA },
+                        shading: { type: ShadingType.CLEAR, fill: COLORS.LightBlue },
+                        margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                        children: [new Paragraph({ children: [new TextRun({ text: "Intervención Recomendada", bold: true, font: "Calibri", size: 18 })] })],
+                      }),
+                    ],
+                  }),
+                  ...incidences.map(inc => new TableRow({
+                    children: [
+                      new TableCell({
+                        width: { size: 1800, type: WidthType.DXA },
+                        margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                        children: [new Paragraph({ children: [new TextRun({ text: t(inc.category), font: "Calibri", size: 18 })] })],
+                      }),
+                      new TableCell({
+                        width: { size: 3613, type: WidthType.DXA },
+                        margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                        children: [new Paragraph({ children: [new TextRun({ text: inc.description, font: "Calibri", size: 18 })] })],
+                      }),
+                      new TableCell({
+                        width: { size: 3613, type: WidthType.DXA },
+                        margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                        children: [new Paragraph({ children: parseMarkdownToTextRuns(inc.aiFeedback || "Pendiente de revisión", { font: "Calibri", size: 18 }) })],
+                      }),
+                    ],
+                  }))
+                ],
+              }),
           
           new Paragraph({ children: [new PageBreak()] }),
 
@@ -471,7 +538,7 @@ export async function exportToDocx(
                         shading: { type: ShadingType.CLEAR, fill: COLORS.Grey },
                         margins: { top: 100, bottom: 100, left: 100, right: 100 },
                         verticalAlign: VerticalAlign.CENTER,
-                        children: [new Paragraph({ children: [new TextRun({ text: f.aiFeedback, font: "Calibri", size: 18, color: COLORS.Mid, italics: true })] })],
+                        children: [new Paragraph({ children: parseMarkdownToTextRuns(f.aiFeedback, { font: "Calibri", size: 18, color: COLORS.Mid }) })],
                       }),
                     ],
                   })
@@ -634,6 +701,33 @@ export async function exportToDocx(
   saveAs(blob, `TDD_Report_${project.name.replace(/\s+/g, '_')}.docx`);
 }
 
+function parseMarkdownToTextRuns(text: string, defaultOptions: any) {
+  const runs: TextRun[] = [];
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+  
+  for (const part of parts) {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      runs.push(new TextRun({
+        ...defaultOptions,
+        text: part.slice(2, -2),
+        bold: true,
+      }));
+    } else if (part.startsWith('*') && part.endsWith('*')) {
+      runs.push(new TextRun({
+        ...defaultOptions,
+        text: part.slice(1, -1),
+        italics: true,
+      }));
+    } else if (part) {
+      runs.push(new TextRun({
+        ...defaultOptions,
+        text: part,
+      }));
+    }
+  }
+  return runs;
+}
+
 function createKpiHeaderCell(text: string, bgColor: string) {
   return new TableCell({
     width: { size: PAGE_WIDTH / 4, type: WidthType.DXA },
@@ -685,46 +779,81 @@ function parseAiChecklist(checklist: string | null) {
     return [createBodyText("No hay notas de IA disponibles.")];
   }
 
-  const lines = checklist.split('\n')
-    .map(line => line.replace(/[*#]/g, '').replace(/^[\-\s]+/, '').trim())
-    .filter(line => line.length > 10);
+  const elements: any[] = [];
+  const lines = checklist.split('\n');
 
-  if (lines.length === 0) {
+  let currentList: any[] = [];
+
+  const flushList = () => {
+    if (currentList.length > 0) {
+      elements.push(
+        new Table({
+          width: { size: PAGE_WIDTH, type: WidthType.DXA },
+          columnWidths: [600, PAGE_WIDTH - 600],
+          borders: {
+            top: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
+            bottom: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
+            left: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
+            right: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
+            insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
+            insideVertical: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
+          },
+          rows: currentList,
+        })
+      );
+      elements.push(new Paragraph({ text: "", spacing: { before: 200 } }));
+      currentList = [];
+    }
+  };
+
+  let itemIndex = 1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    if (line.startsWith('#')) {
+      flushList();
+      const headerText = line.replace(/^#+\s*/, '');
+      elements.push(createHeading2(headerText));
+      itemIndex = 1; // Reset index for new section
+    } else if (line.startsWith('-') || line.startsWith('*') || /^\d+\./.test(line)) {
+      const isBullet = line.startsWith('-') || line.startsWith('*');
+      const cleanLine = line.replace(/^([\-\*]|\d+\.)\s*/, '').trim();
+      
+      if (cleanLine.length > 0) {
+        currentList.push(
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 600, type: WidthType.DXA },
+                margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                verticalAlign: VerticalAlign.CENTER,
+                children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: isBullet ? "•" : `${itemIndex}.`, font: "Calibri", size: 20, bold: true })] })],
+              }),
+              new TableCell({
+                width: { size: PAGE_WIDTH - 600, type: WidthType.DXA },
+                margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                verticalAlign: VerticalAlign.CENTER,
+                children: [new Paragraph({ children: parseMarkdownToTextRuns(cleanLine, { font: "Calibri", size: 20 }) })],
+              }),
+            ],
+          })
+        );
+        if (!isBullet) itemIndex++;
+      }
+    } else {
+      // It's a regular paragraph, not a list item
+      flushList();
+      elements.push(createBodyText(line));
+    }
+  }
+
+  flushList();
+
+  if (elements.length === 0) {
     return [createBodyText("No hay notas de IA disponibles.")];
   }
 
-  const rows = lines.map((line, index) => {
-    return new TableRow({
-      children: [
-        new TableCell({
-          width: { size: 600, type: WidthType.DXA },
-          margins: { top: 100, bottom: 100, left: 100, right: 100 },
-          verticalAlign: VerticalAlign.CENTER,
-          children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `${index + 1}.`, font: "Calibri", size: 20, bold: true })] })],
-        }),
-        new TableCell({
-          width: { size: PAGE_WIDTH - 600, type: WidthType.DXA },
-          margins: { top: 100, bottom: 100, left: 100, right: 100 },
-          verticalAlign: VerticalAlign.CENTER,
-          children: [new Paragraph({ children: [new TextRun({ text: line, font: "Calibri", size: 20 })] })],
-        }),
-      ],
-    });
-  });
-
-  return [
-    new Table({
-      width: { size: PAGE_WIDTH, type: WidthType.DXA },
-      columnWidths: [600, PAGE_WIDTH - 600],
-      borders: {
-        top: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
-        bottom: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
-        left: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
-        right: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
-        insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
-        insideVertical: { style: BorderStyle.SINGLE, size: 4, color: COLORS.LightBlue },
-      },
-      rows: rows,
-    })
-  ];
+  return elements;
 }

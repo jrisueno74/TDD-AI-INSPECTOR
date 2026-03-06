@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Project, Finding } from '../types';
 import { analyzeFinding } from '../services/geminiService';
-import { Camera, Mic, MicOff, AlertTriangle, CheckCircle2, Send, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Camera, Image as ImageIcon, Mic, MicOff, AlertTriangle, CheckCircle2, Send, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import Markdown from 'react-markdown';
 import { useLanguage } from '../context/LanguageContext';
 
 interface Props {
@@ -48,7 +49,8 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
     return acc;
   }, {} as Record<string, Finding[]>);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
@@ -121,13 +123,15 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description) return;
+    if (!description.trim() && !photoBase64) return;
 
     setIsAnalyzing(true);
 
+    const finalDescription = description.trim() || "Inspección visual registrada mediante fotografía.";
+
     const partialFinding = {
       category,
-      description,
+      description: finalDescription,
       photoBase64: photoBase64 || undefined,
       photoMimeType: photoMimeType || undefined,
     };
@@ -137,7 +141,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
     const newFinding: Finding = {
       id: Date.now().toString(),
       category,
-      description,
+      description: finalDescription,
       photoUrl: photoPreview || undefined,
       photoBase64: photoBase64 || undefined,
       photoMimeType: photoMimeType || undefined,
@@ -194,7 +198,6 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={t('inspection.placeholder')}
                 className="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3 border min-h-[100px]"
-                required
               />
             </div>
 
@@ -202,17 +205,34 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
               <div className="flex items-center gap-4">
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => cameraInputRef.current?.click()}
                   className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
                 >
                   <Camera className="w-5 h-5" />
-                  <span className="text-sm font-medium">{t('inspection.photo')}</span>
+                  <span className="text-sm font-medium hidden sm:inline">{t('inspection.camera')}</span>
+                </button>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  capture="environment"
+                  className="hidden" 
+                  ref={cameraInputRef}
+                  onChange={handlePhotoUpload}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
+                >
+                  <ImageIcon className="w-5 h-5" />
+                  <span className="text-sm font-medium hidden sm:inline">{t('inspection.gallery')}</span>
                 </button>
                 <input 
                   type="file" 
                   accept="image/*" 
                   className="hidden" 
-                  ref={fileInputRef}
+                  ref={galleryInputRef}
                   onChange={handlePhotoUpload}
                 />
                 
@@ -225,7 +245,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
                   title={isListening ? "Detener dictado" : t('inspection.dictate')}
                 >
                   {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                  <span className="text-sm font-medium">{isListening ? t('inspection.listening') : t('inspection.dictate')}</span>
+                  <span className="text-sm font-medium hidden sm:inline">{isListening ? t('inspection.listening') : t('inspection.dictate')}</span>
                 </button>
               </div>
 
@@ -256,7 +276,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
 
             <button
               type="submit"
-              disabled={isAnalyzing || !description}
+              disabled={isAnalyzing || (!description.trim() && !photoBase64)}
               className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isAnalyzing ? (
@@ -349,7 +369,9 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
                           {f.aiFeedback && (
                             <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800 border border-blue-100 mt-2">
                               <p className="font-medium mb-1 text-xs uppercase tracking-wider">Asistente IA:</p>
-                              <p className="whitespace-pre-wrap">{f.aiFeedback}</p>
+                              <div className="prose prose-sm prose-blue max-w-none">
+                                <Markdown>{f.aiFeedback}</Markdown>
+                              </div>
                             </div>
                           )}
                         </div>

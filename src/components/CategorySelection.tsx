@@ -3,16 +3,30 @@ import { Project } from '../types';
 import { CheckSquare, Square, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
-export const ALL_CATEGORIES = [
-  'cat.structure',
-  'cat.facade',
-  'cat.roof',
-  'cat.hvac',
-  'cat.fire',
-  'cat.electrical',
-  'cat.plumbing',
-  'cat.accessibility'
-];
+export const CATEGORY_GROUPS = {
+  'group.architecture': [
+    'cat.structure',
+    'cat.facade',
+    'cat.roof',
+    'cat.partitioning',
+    'cat.finishes',
+    'cat.accessibility',
+    'cat.exteriors'
+  ],
+  'group.installations': [
+    'cat.fire',
+    'cat.plumbing',
+    'cat.sanitation',
+    'cat.dhw',
+    'cat.hvac',
+    'cat.ventilation',
+    'cat.electrical',
+    'cat.telecom',
+    'cat.security'
+  ]
+};
+
+export const ALL_CATEGORIES = Object.values(CATEGORY_GROUPS).flat();
 
 interface Props {
   project: Project;
@@ -45,24 +59,33 @@ export function CategorySelection({ project, onConfirm, onCancel }: Props) {
         Selecciona las categorías que aplican para el edificio <strong>{project.name}</strong>.
       </p>
 
-      <div className="space-y-2 mb-8">
-        {ALL_CATEGORIES.map(cat => (
-          <button
-            key={cat}
-            onClick={() => toggleCategory(cat)}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
-              selected.includes(cat) 
-                ? 'bg-blue-50 border-blue-200 text-blue-900' 
-                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            {selected.includes(cat) ? (
-              <CheckSquare className="w-5 h-5 text-blue-600" />
-            ) : (
-              <Square className="w-5 h-5 text-gray-400" />
-            )}
-            <span className="font-medium">{t(cat)}</span>
-          </button>
+      <div className="space-y-6 mb-8">
+        {Object.entries(CATEGORY_GROUPS).map(([groupKey, categories]) => (
+          <div key={groupKey}>
+            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
+              {t(groupKey)}
+            </h3>
+            <div className="space-y-2">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => toggleCategory(cat)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                    selected.includes(cat) 
+                      ? 'bg-blue-50 border-blue-200 text-blue-900' 
+                      : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {selected.includes(cat) ? (
+                    <CheckSquare className="w-5 h-5 text-blue-600" />
+                  ) : (
+                    <Square className="w-5 h-5 text-gray-400" />
+                  )}
+                  <span className="font-medium">{t(cat)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
 

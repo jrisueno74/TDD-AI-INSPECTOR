@@ -4,6 +4,9 @@ export interface Project {
   year: number;
   type: string;
   selectedCategories: string[];
+  lat?: number;
+  lng?: number;
+  locationDescription?: string;
 }
 
 export interface Finding {
