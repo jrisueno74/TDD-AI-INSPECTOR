@@ -26,7 +26,11 @@ export function Dashboard({ onNewInspection, onLoadInspection }: Props) {
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
   useEffect(() => {
-    setInspections(getInspections().sort((a, b) => b.updatedAt - a.updatedAt));
+    const loadInspections = async () => {
+      const data = await getInspections();
+      setInspections(data.sort((a, b) => b.updatedAt - a.updatedAt));
+    };
+    loadInspections();
   }, []);
 
   const handleDeleteClick = (e: React.MouseEvent, id: string) => {
@@ -34,10 +38,11 @@ export function Dashboard({ onNewInspection, onLoadInspection }: Props) {
     setInspectionToDelete(id);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (inspectionToDelete) {
-      deleteInspection(inspectionToDelete);
-      setInspections(getInspections().sort((a, b) => b.updatedAt - a.updatedAt));
+      await deleteInspection(inspectionToDelete);
+      const data = await getInspections();
+      setInspections(data.sort((a, b) => b.updatedAt - a.updatedAt));
       setInspectionToDelete(null);
     }
   };

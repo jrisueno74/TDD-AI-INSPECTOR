@@ -1,9 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Project, Finding } from '../types';
 import { analyzeFinding } from '../services/geminiService';
 import { Camera, Image as ImageIcon, Mic, MicOff, AlertTriangle, CheckCircle2, Send, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { useLanguage } from '../context/LanguageContext';
+
+export interface InspectionViewRef {
+  savePendingFinding: () => Promise<void>;
+}
 
 interface Props {
   project: Project;
@@ -12,7 +16,7 @@ interface Props {
   onFinish: () => void;
 }
 
-export function InspectionView({ project, findings, onAddFinding, onFinish }: Props) {
+export const InspectionView = forwardRef<InspectionViewRef, Props>(({ project, findings, onAddFinding, onFinish }, ref) => {
   const { t, language } = useLanguage();
   const categories = project.selectedCategories || ['cat.structure'];
   const [category, setCategory] = useState(categories[0]);
@@ -21,9 +25,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
-  const [photoMimeType, setPhotoMimeType] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<{ url: string; base64: string; mimeType: string }[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [filterType, setFilterType] = useState<'all' | 'incidence' | 'observation'>('all');
 
@@ -104,26 +106,36 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      setPhotoPreview(result);
-      
-      const match = result.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
-      if (match) {
-        setPhotoMimeType(match[1]);
-        setPhotoBase64(match[2]);
-      }
-    };
-    reader.readAsDataURL(file);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        const match = result.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+        
+        if (match) {
+          setPhotos(prev => [...prev, {
+            url: result,
+            mimeType: match[1],
+            base64: match[2]
+          }]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    
+    // Reset input so the same file can be selected again if needed
+    e.target.value = '';
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!description.trim() && !photoBase64) return;
+  const removePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const savePendingFinding = async () => {
+    if (!description.trim() && photos.length === 0) return;
 
     setIsAnalyzing(true);
 
@@ -132,19 +144,17 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
     const partialFinding = {
       category,
       description: finalDescription,
-      photoBase64: photoBase64 || undefined,
-      photoMimeType: photoMimeType || undefined,
+      photos: photos.length > 0 ? photos : undefined,
     };
 
+    // For quick save & exit, we might skip AI or await it. We will await it to ensure data is complete.
     const aiFeedback = await analyzeFinding(project, partialFinding, language);
 
     const newFinding: Finding = {
       id: Date.now().toString(),
       category,
       description: finalDescription,
-      photoUrl: photoPreview || undefined,
-      photoBase64: photoBase64 || undefined,
-      photoMimeType: photoMimeType || undefined,
+      photos: photos.length > 0 ? photos : undefined,
       aiFeedback,
       isIncidence,
       timestamp: Date.now(),
@@ -152,17 +162,33 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
 
     onAddFinding(newFinding);
     setDescription('');
-    setPhotoPreview(null);
-    setPhotoBase64(null);
-    setPhotoMimeType(null);
+    setPhotos([]);
     setIsIncidence(false);
     setIsAnalyzing(false);
   };
 
+  useImperativeHandle(ref, () => ({
+    savePendingFinding
+  }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await savePendingFinding();
+  };
+
   const missingCategories = categories.filter(c => !findings.some(f => f.category === c));
 
-  const handleAttemptFinish = () => {
-    if (missingCategories.length > 0) {
+  const handleAttemptFinish = async () => {
+    if (description.trim() || photos.length > 0) {
+      await savePendingFinding();
+    }
+
+    // Re-evaluate missing categories after potentially adding the pending finding
+    const currentMissing = categories.filter(c => 
+      !findings.some(f => f.category === c) && category !== c // Assume the pending one fills its category
+    );
+
+    if (currentMissing.length > 0) {
       setShowWarning(true);
     } else {
       onFinish();
@@ -215,6 +241,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
                   type="file" 
                   accept="image/*" 
                   capture="environment"
+                  multiple
                   className="hidden" 
                   ref={cameraInputRef}
                   onChange={handlePhotoUpload}
@@ -231,6 +258,7 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
                 <input 
                   type="file" 
                   accept="image/*" 
+                  multiple
                   className="hidden" 
                   ref={galleryInputRef}
                   onChange={handlePhotoUpload}
@@ -260,23 +288,27 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
               </label>
             </div>
 
-            {photoPreview && (
-              <div className="relative inline-block mt-4">
-                <img src={photoPreview} alt="Preview" className="h-32 rounded-lg object-cover border border-gray-200" />
-                <button
-                  type="button"
-                  onClick={() => { setPhotoPreview(null); setPhotoBase64(null); setPhotoMimeType(null); }}
-                  className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 hover:bg-red-200"
-                >
-                  <span className="sr-only">Eliminar</span>
-                  &times;
-                </button>
+            {photos.length > 0 && (
+              <div className="flex flex-wrap gap-4 mt-4">
+                {photos.map((photo, index) => (
+                  <div key={index} className="relative inline-block">
+                    <img src={photo.url} alt={`Preview ${index + 1}`} className="h-32 w-32 rounded-lg object-cover border border-gray-200" />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(index)}
+                      className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 hover:bg-red-200"
+                    >
+                      <span className="sr-only">Eliminar</span>
+                      &times;
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
 
             <button
               type="submit"
-              disabled={isAnalyzing || (!description.trim() && !photoBase64)}
+              disabled={isAnalyzing || (!description.trim() && photos.length === 0)}
               className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isAnalyzing ? (
@@ -363,8 +395,14 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
                             <span className="text-xs text-gray-400">{new Date(f.timestamp).toLocaleTimeString()}</span>
                           </div>
                           <p className="text-sm text-gray-900 mb-2">{f.description}</p>
-                          {f.photoUrl && (
-                            <img src={f.photoUrl} alt="Finding" className="h-24 rounded-lg object-cover mb-2 border border-gray-200" />
+                          {f.photos && f.photos.length > 0 ? (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {f.photos.map((photo, idx) => (
+                                <img key={idx} src={photo.url} alt={`Finding ${idx + 1}`} className="h-24 w-24 rounded-lg object-cover border border-gray-200" />
+                              ))}
+                            </div>
+                          ) : f.photoUrl && (
+                            <img src={f.photoUrl} alt="Finding" className="h-24 w-24 rounded-lg object-cover mb-2 border border-gray-200" />
                           )}
                           {f.aiFeedback && (
                             <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800 border border-blue-100 mt-2">
@@ -459,4 +497,4 @@ export function InspectionView({ project, findings, onAddFinding, onFinish }: Pr
       )}
     </div>
   );
-}
+});

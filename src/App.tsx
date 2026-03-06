@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Project, Finding, ViewState, SavedInspection } from './types';
 import { ProjectSetup } from './components/ProjectSetup';
 import { CategorySelection } from './components/CategorySelection';
-import { InspectionView } from './components/InspectionView';
+import { InspectionView, InspectionViewRef } from './components/InspectionView';
 import { ReportView } from './components/ReportView';
 import { Dashboard } from './components/Dashboard';
 import { ClipboardCheck, Globe } from 'lucide-react';
@@ -16,18 +16,23 @@ export default function App() {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
+  const inspectionRef = useRef<InspectionViewRef>(null);
+  const [isSavingExit, setIsSavingExit] = useState(false);
 
   // Auto-save effect
   useEffect(() => {
-    if (currentId && project) {
-      saveInspection({
-        id: currentId,
-        updatedAt: Date.now(),
-        status: view === 'report' ? 'completed' : 'draft',
-        project,
-        findings
-      });
-    }
+    const save = async () => {
+      if (currentId && project) {
+        await saveInspection({
+          id: currentId,
+          updatedAt: Date.now(),
+          status: view === 'report' ? 'completed' : 'draft',
+          project,
+          findings
+        });
+      }
+    };
+    save();
   }, [currentId, project, findings, view]);
 
   const handleNewInspection = () => {
@@ -70,6 +75,19 @@ export default function App() {
     setFindings(prev => [...prev, f]);
   };
 
+  const handleSaveAndExit = async () => {
+    if (view === 'inspection' && inspectionRef.current) {
+      setIsSavingExit(true);
+      try {
+        await inspectionRef.current.savePendingFinding();
+      } catch (e) {
+        console.error("Error saving pending finding", e);
+      }
+      setIsSavingExit(false);
+    }
+    setView('dashboard');
+  };
+
   const handleFinish = () => {
     setView('report');
   };
@@ -87,7 +105,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div 
             className="flex items-center gap-2 cursor-pointer" 
-            onClick={() => setView('dashboard')}
+            onClick={handleSaveAndExit}
           >
             <div className="bg-blue-600 p-2 rounded-lg">
               <ClipboardCheck className="w-5 h-5 text-white" />
@@ -101,10 +119,11 @@ export default function App() {
                   {project.name}
                 </div>
                 <button
-                  onClick={() => setView('dashboard')}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  onClick={handleSaveAndExit}
+                  disabled={isSavingExit}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
                 >
-                  {t('inspection.save_exit')}
+                  {isSavingExit ? t('inspection.analyzing') : t('inspection.save_exit')}
                 </button>
               </div>
             )}
@@ -147,6 +166,7 @@ export default function App() {
         )}
         {view === 'inspection' && project && (
           <InspectionView 
+            ref={inspectionRef}
             project={project} 
             findings={findings} 
             onAddFinding={handleAddFinding}

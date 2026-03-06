@@ -9,7 +9,7 @@ export async function analyzeFinding(
   language: string = 'es'
 ): Promise<string> {
   const descriptionText = finding.description === "Inspección visual registrada mediante fotografía."
-    ? "The inspector has attached a photo without a specific description. Please analyze the photo carefully to identify any potential issues, anomalies, or relevant elements related to this category."
+    ? "The inspector has attached one or more photos without a specific description. Please analyze the photos carefully to identify any potential issues, anomalies, or relevant elements related to this category."
     : `"${finding.description}"`;
 
   const prompt = `
@@ -26,7 +26,16 @@ Keep the response concise, professional, structured, and in the language: ${lang
 
   const parts: any[] = [{ text: prompt }];
 
-  if (finding.photoBase64 && finding.photoMimeType) {
+  if (finding.photos && finding.photos.length > 0) {
+    finding.photos.forEach(photo => {
+      parts.unshift({
+        inlineData: {
+          data: photo.base64,
+          mimeType: photo.mimeType,
+        },
+      });
+    });
+  } else if (finding.photoBase64 && finding.photoMimeType) {
     parts.unshift({
       inlineData: {
         data: finding.photoBase64,
@@ -75,6 +84,34 @@ Respond in Markdown format, structured, direct, with clear paragraph separation,
   } catch (error) {
     console.error("Error calling Gemini:", error);
     return "Error al generar el checklist final.";
+  }
+}
+
+export async function generateUndetectedIncidencesSummary(project: Project, findings: Finding[], language: string = 'es'): Promise<string> {
+  const observations = findings.filter(f => !f.isIncidence);
+  if (observations.length === 0) return "No se han registrado observaciones que revisar.";
+
+  const prompt = `
+You are an expert in Technical Due Diligence.
+The inspector has finished the visit of a building type "${project.type}" from the year ${project.year}.
+Here are the findings that the inspector marked as "OK" (NOT an incidence), along with the AI's feedback for each:
+${observations.map(f => `- [${f.category}] Description: ${f.description}\n  AI Feedback: ${f.aiFeedback}`).join('\n')}
+
+Your goal is to identify and summarize any potential non-conformities or issues that the AI detected in these "OK" findings, which the inspector might have missed or misclassified.
+If there are no hidden issues, just respond with a short sentence saying that no potential undetected incidences were found.
+If there are issues, summarize them clearly in bullet points. Do not use markdown headings, just bullet points or short paragraphs.
+Respond in the language: ${language}.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+    });
+    return response.text || "No se detectaron incidencias ocultas.";
+  } catch (error) {
+    console.error("Error calling Gemini:", error);
+    return "Error al analizar las potenciales incidencias.";
   }
 }
 

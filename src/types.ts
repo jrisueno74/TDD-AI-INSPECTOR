@@ -9,13 +9,20 @@ export interface Project {
   locationDescription?: string;
 }
 
+export interface FindingPhoto {
+  url: string;
+  mimeType: string;
+  base64: string;
+}
+
 export interface Finding {
   id: string;
   category: string;
   description: string;
-  photoUrl?: string;
-  photoMimeType?: string;
-  photoBase64?: string;
+  photoUrl?: string; // Kept for backward compatibility
+  photoMimeType?: string; // Kept for backward compatibility
+  photoBase64?: string; // Kept for backward compatibility
+  photos?: FindingPhoto[];
   aiFeedback?: string;
   isIncidence: boolean;
   timestamp: number;

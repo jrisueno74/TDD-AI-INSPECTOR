@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Project, Finding } from '../types';
-import { generateFinalChecklist } from '../services/geminiService';
+import { generateFinalChecklist, generateUndetectedIncidencesSummary } from '../services/geminiService';
 import { exportToDocx } from '../services/exportService';
 import { Building, AlertTriangle, CheckCircle2, Download, Loader2, FileText } from 'lucide-react';
 import Markdown from 'react-markdown';
@@ -15,12 +15,17 @@ interface Props {
 export function ReportView({ project, findings, onRestart }: Props) {
   const { t, language } = useLanguage();
   const [checklist, setChecklist] = useState<string | null>(null);
+  const [undetectedSummary, setUndetectedSummary] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(true);
 
   useEffect(() => {
     async function fetchChecklist() {
-      const result = await generateFinalChecklist(project, findings, language);
+      const [result, undetected] = await Promise.all([
+        generateFinalChecklist(project, findings, language),
+        generateUndetectedIncidencesSummary(project, findings, language)
+      ]);
       setChecklist(result);
+      setUndetectedSummary(undetected);
       setIsGenerating(false);
     }
     fetchChecklist();
@@ -43,7 +48,7 @@ export function ReportView({ project, findings, onRestart }: Props) {
   };
 
   const handleExportDocx = async () => {
-    await exportToDocx(project, findings, checklist, t);
+    await exportToDocx(project, findings, checklist, undetectedSummary, t);
   };
 
   return (
@@ -117,14 +122,22 @@ export function ReportView({ project, findings, onRestart }: Props) {
                       </p>
                       <p className="text-sm text-gray-600 mb-3">{f.description}</p>
                       
-                      {f.photoUrl && (
-                        <img src={f.photoUrl} alt="Evidencia" className="h-32 rounded-lg object-cover border border-gray-200 mb-3" />
+                      {f.photos && f.photos.length > 0 ? (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {f.photos.map((photo, idx) => (
+                            <img key={idx} src={photo.url} alt={`Evidencia ${idx + 1}`} className="h-32 w-32 rounded-lg object-cover border border-gray-200" />
+                          ))}
+                        </div>
+                      ) : f.photoUrl && (
+                        <img src={f.photoUrl} alt="Evidencia" className="h-32 w-32 rounded-lg object-cover border border-gray-200 mb-3" />
                       )}
                       
                       {f.aiFeedback && (
                         <div className="bg-white/60 rounded-lg p-3 text-xs text-gray-700 border border-gray-200">
                           <span className="font-semibold block mb-1">{t('report.ai_note')}:</span>
-                          {f.aiFeedback}
+                          <div className="prose prose-sm max-w-none prose-p:leading-snug prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+                            <Markdown>{f.aiFeedback}</Markdown>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -149,8 +162,19 @@ export function ReportView({ project, findings, onRestart }: Props) {
               <span>{t('report.generating')}</span>
             </div>
           ) : (
-            <div className="prose prose-blue max-w-none text-blue-900 prose-headings:text-blue-900 prose-headings:font-bold prose-h3:text-lg prose-h3:mt-6 prose-h3:mb-3 prose-p:mb-4 prose-li:mb-2">
-              <Markdown>{checklist || ''}</Markdown>
+            <div className="space-y-6">
+              <div className="prose prose-blue max-w-none text-blue-900 prose-headings:text-blue-900 prose-headings:font-bold prose-h3:text-lg prose-h3:mt-6 prose-h3:mb-3 prose-p:mb-4 prose-li:mb-2">
+                <Markdown>{checklist || ''}</Markdown>
+              </div>
+              
+              {undetectedSummary && undetectedSummary !== "No se detectaron incidencias ocultas." && undetectedSummary !== "No se han registrado observaciones que revisar." && (
+                <div className="mt-8 pt-6 border-t border-blue-200">
+                  <h3 className="text-lg font-bold text-blue-900 mb-3">Potenciales Incidencias no detectadas</h3>
+                  <div className="prose prose-blue max-w-none text-blue-900 prose-p:mb-4 prose-li:mb-2">
+                    <Markdown>{undetectedSummary}</Markdown>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -124,6 +124,7 @@ export async function exportToDocx(
   project: Project, 
   findings: Finding[], 
   checklist: string | null, 
+  undetectedSummary: string | null,
   t: (key: string) => string
 ) {
   const incidences = findings.filter(f => f.isIncidence);
@@ -424,6 +425,12 @@ export async function exportToDocx(
                 ],
               }),
           
+          ...(undetectedSummary && undetectedSummary !== "No se detectaron incidencias ocultas." && undetectedSummary !== "No se han registrado observaciones que revisar." ? [
+            new Paragraph({ text: "", spacing: { before: 400 } }),
+            createHeading2(project.locationDescription ? "1.5 Resumen de Potenciales Incidencias no detectadas (IA)" : "1.4 Resumen de Potenciales Incidencias no detectadas (IA)"),
+            ...parseAiChecklist(undetectedSummary)
+          ] : []),
+
           new Paragraph({ children: [new PageBreak()] }),
 
           // 2B. DETALLE POR CATEGORÍA
@@ -562,7 +569,39 @@ export async function exportToDocx(
                 new Paragraph({ text: "", spacing: { before: 100 } })
               );
 
-              if (f.photoUrl) {
+              if (f.photos && f.photos.length > 0) {
+                f.photos.forEach((photo, idx) => {
+                  try {
+                    const base64Data = photo.url.split(',')[1];
+                    if (base64Data) {
+                      const binaryString = atob(base64Data);
+                      const len = binaryString.length;
+                      const bytes = new Uint8Array(len);
+                      for (let i = 0; i < len; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                      }
+                      categoryBlocks.push(
+                        new Paragraph({
+                          alignment: AlignmentType.CENTER,
+                          spacing: { before: 100, after: 200 },
+                          children: [
+                            new ImageRun({
+                              data: bytes,
+                              transformation: {
+                                width: 300,
+                                height: 300,
+                              },
+                              type: photo.mimeType === 'image/png' ? 'png' : 'jpg'
+                            }),
+                          ],
+                        })
+                      );
+                    }
+                  } catch (e) {
+                    console.error("Error adding image to DOCX", e);
+                  }
+                });
+              } else if (f.photoUrl) {
                 try {
                   const base64Data = f.photoUrl.split(',')[1];
                   if (base64Data) {
@@ -703,28 +742,71 @@ export async function exportToDocx(
 
 function parseMarkdownToTextRuns(text: string, defaultOptions: any) {
   const runs: TextRun[] = [];
-  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
   
-  for (const part of parts) {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      runs.push(new TextRun({
-        ...defaultOptions,
-        text: part.slice(2, -2),
-        bold: true,
-      }));
-    } else if (part.startsWith('*') && part.endsWith('*')) {
-      runs.push(new TextRun({
-        ...defaultOptions,
-        text: part.slice(1, -1),
-        italics: true,
-      }));
-    } else if (part) {
-      runs.push(new TextRun({
-        ...defaultOptions,
-        text: part,
-      }));
+  // Split by newlines to handle breaks
+  const lines = text.split('\n');
+  
+  lines.forEach((line, lineIndex) => {
+    let isHeading = false;
+    let cleanLine = line;
+    
+    if (/^#+\s+/.test(line)) {
+      isHeading = true;
+      cleanLine = line.replace(/^#+\s+/, '');
+    } else {
+      // Clean up list items like "- " or "* " at the start of a line
+      cleanLine = line.replace(/^[\-\*]\s+/, '• ');
     }
-  }
+    
+    const parts = cleanLine.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+    let isFirstRunOfLine = true;
+    
+    for (const part of parts) {
+      if (!part && parts.length > 1) continue; // Skip empty parts unless it's the only part
+      
+      const runOptions: any = { ...defaultOptions };
+      if (isFirstRunOfLine && lineIndex > 0) {
+        runOptions.break = 1;
+      }
+      
+      if (isHeading) {
+        runOptions.bold = true;
+        if (runOptions.size) {
+          runOptions.size = runOptions.size + 2;
+        }
+      }
+      
+      if (part.startsWith('**') && part.endsWith('**')) {
+        runs.push(new TextRun({
+          ...runOptions,
+          text: part.slice(2, -2),
+          bold: true,
+        }));
+        isFirstRunOfLine = false;
+      } else if (part.startsWith('*') && part.endsWith('*')) {
+        runs.push(new TextRun({
+          ...runOptions,
+          text: part.slice(1, -1),
+          italics: true,
+        }));
+        isFirstRunOfLine = false;
+      } else if (part) {
+        runs.push(new TextRun({
+          ...runOptions,
+          text: part,
+        }));
+        isFirstRunOfLine = false;
+      } else if (part === '' && parts.length === 1) {
+        // Empty line
+        runs.push(new TextRun({
+          ...runOptions,
+          text: "",
+        }));
+        isFirstRunOfLine = false;
+      }
+    }
+  });
+  
   return runs;
 }
 
