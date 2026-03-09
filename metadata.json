@@ -1,0 +1,5 @@
+{
+  "name": "DiligentIA",
+  "description": "Herramienta para hacer inspecciones de Technical Due Diligence.",
+  "requestFramePermissions": ["camera", "microphone"]
+}
